@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Nam Jap Counter</title>
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a">
+    <style>
+        :root {
+            --gold: #ffcc00;
+            --bg: #1a1a1a;
+            --card: #2a2a2a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .stats-container {
+            position: absolute;
+            top: 50px;
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-box {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 20px;
+            width: 45%;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            border: 1px solid #333;
+        }
+
+        .stat-label { font-size: 0.7rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .stat-number { font-size: 1.5rem; font-weight: bold; color: var(--gold); }
+
+        .main-display {
+            font-size: 6rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .tap-zone {
+            width: 280px;
+            height: 280px;
+            background: radial-gradient(circle, #333 0%, #1a1a1a 100%);
+            border: 6px solid var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            color: var(--gold);
+            cursor: pointer;
+            box-shadow: 0 0 50px rgba(255, 204, 0, 0.15);
+            touch-action: manipulation;
+            transition: transform 0.05s ease;
+        }
+
+        .tap-zone:active {
+            transform: scale(0.94);
+            border-color: #fff;
+            color: #fff;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #444;
+            color: #888;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .btn:active { background: #333; }
+    </style>
+</head>
+<body>
+
+    <div class="stats-container">
+        <div class="stat-box">
+            <div class="stat-label">Today</div>
+            <div id="dailyCount">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Lifetime</div>
+            <div id="totalCount">0</div>
+        </div>
+    </div>
+
+    <div class="main-display" id="mainDisplay">0</div>
+    <div class="tap-zone" onclick="doTap()">JAP</div>
+
+    <div class="footer">
+        <button class="btn" onclick="resetDaily()">Reset Daily</button>
+        <button class="btn" onclick="exportData()">Export Data</button>
+    </div>
+
+<script>
+    let db;
+    let counts = { daily: 0, total: 0, lastUpdate: new Date().toISOString().split('T')[0] };
+
+    const request = indexedDB.open("NamJapDB", 1);
+    request.onupgradeneeded = e => {
+        e.target.result.createObjectStore("store");
+    };
+
+    request.onsuccess = e => {
+        db = e.target.result;
+        const tx = db.transaction("store", "readonly");
+        const req = tx.objectStore("store").get("appData");
+        req.onsuccess = () => {
+            if (req.result) {
+                counts = req.result;
+                const today = new Date().toISOString().split('T')[0];
+                if (counts.lastUpdate !== today) {
+                    counts.daily = 0;
+                    counts.lastUpdate = today;
+                }
+            }
+            updateUI();
+        };
+    };
+
+    function doTap() {
+        counts.daily++;
+        counts.total++;
+        updateUI();
+        const tx = db.transaction("store", "readwrite");
+        tx.objectStore("store").put(counts, "appData");
+    }
+
+    function updateUI() {
+        document.getElementById('mainDisplay').innerText = counts.daily;
+        document.getElementById('dailyCount').innerText = counts.daily;
+        document.getElementById('totalCount').innerText = counts.total;
+    }
+
+    function resetDaily() {
+        if(confirm("Reset today's count?")) {
+            counts.daily = 0;
+            const tx = db.transaction("store", "readwrite");
+            tx.objectStore("store").put(counts, "appData");
+            updateUI();
+        }
+    }
+
+    function exportData() {
+        const blob = new Blob([JSON.stringify(counts, null, 2)], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `nam_jap_data.json`;
+        a.click();
+    }
+</script>
+</body>
+</html>
